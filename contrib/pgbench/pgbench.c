@@ -57,6 +57,11 @@
 #define INT64_MAX	INT64CONST(0x7FFFFFFFFFFFFFFF)
 #endif
 
+#ifdef HAVE_EPOLL
+#include <sys/epoll.h>
+#define MAX_EVENTS 65536
+#endif
+
 /*
  * Multi-platform pthread implementations
  */
@@ -96,10 +101,15 @@ extern int	optind;
  * some configurable parameters */
 
 /* max number of clients allowed */
+
+#ifdef HAVE_EPOLL
+#define MAXCLIENTS	MAX_EVENTS
+#else
 #ifdef FD_SETSIZE
 #define MAXCLIENTS	(FD_SETSIZE - 10)
 #else
 #define MAXCLIENTS	1024
+#endif
 #endif
 
 #define DEFAULT_NXACTS	10		/* default nxacts */
@@ -2365,6 +2375,16 @@ threadRun(void *arg)
 	int			remains = nstate;		/* number of remaining clients */
 	int			i;
 
+#ifdef HAVE_EPOLL
+	int		epfd;
+	epfd = epoll_create(MAX_EVENTS);
+	if (epfd < 0)
+	{
+		fprintf(stderr, "epoll_create failed: %s\n", strerror(errno));
+		goto done;
+	}
+#endif
+
 	result = xmalloc(sizeof(TResult));
 	INSTR_TIME_SET_ZERO(result->conn_time);
 
@@ -2422,14 +2442,19 @@ threadRun(void *arg)
 
 	while (remains > 0)
 	{
-		fd_set		input_mask;
 		int			maxsock;	/* max socket number to be waited */
 		int64		now_usec = 0;
 		int64		min_usec;
 		int			sock;
 		int			nfds;
-
+#ifdef HAVE_EPOLL
+		struct epoll_event	events[MAX_EVENTS];
+		struct epoll_event	ev;
+		int			n;
+#else
+		fd_set		input_mask;
 		FD_ZERO(&input_mask);
+#endif
 
 		maxsock = -1;
 		min_usec = INT64_MAX;
@@ -2471,7 +2496,20 @@ threadRun(void *arg)
 				goto done;
 			}
 
+#ifdef HAVE_EPOLL
+			memset(&ev, 0, sizeof(ev));
+			ev.events = EPOLLIN | EPOLLET;
+			ev.data.fd = sock;
+
+			if (epoll_ctl(epfd, EPOLL_CTL_ADD, sock, &ev) < 0) {
+				if (errno != EEXIST) {
+					fprintf(stderr, "epoll_ctl failed: %s\n", strerror(errno));
+					exit(1);
+				}
+			}
+#else
 			FD_SET(sock, &input_mask);
+#endif
 
 			if (maxsock < sock)
 				maxsock = sock;
@@ -2481,14 +2519,22 @@ threadRun(void *arg)
 		{
 			if (min_usec != INT64_MAX)
 			{
+#ifdef HAVE_EPOLL
+				nfds = epoll_wait(epfd, events, MAX_EVENTS, min_usec);
+#else
 				struct timeval timeout;
 
 				timeout.tv_sec = min_usec / 1000000;
 				timeout.tv_usec = min_usec % 1000000;
 				nfds = select(maxsock + 1, &input_mask, NULL, NULL, &timeout);
+#endif
 			}
 			else
+#ifdef HAVE_EPOLL
+				nfds = epoll_wait(epfd, events, MAX_EVENTS, -1);
+#else
 				nfds = select(maxsock + 1, &input_mask, NULL, NULL, NULL);
+#endif
 			if (nfds < 0)
 			{
 				if (errno == EINTR)
@@ -2508,11 +2554,20 @@ threadRun(void *arg)
 
 			if (st->con)
 			{
-				if (FD_ISSET(PQsocket(st->con), &input_mask) || commands[st->state]->type == META_COMMAND)
+#ifdef HAVE_EPOLL
+				for (n = 0; n < nfds; n++)
 				{
-					if (!doCustom(thread, st, &result->conn_time, logfile))
-						remains--;	/* I've aborted */
+					if (events[n].data.fd == sock || commands[st->state]->type == META_COMMAND)
+#else
+				if (FD_ISSET(PQsocket(st->con), &input_mask) || commands[st->state]->type == META_COMMAND)
+#endif
+					{
+						if (!doCustom(thread, st, &result->conn_time, logfile))
+							remains--;	/* I've aborted */
+					}
+#ifdef HAVE_EPOLL
 				}
+#endif
 			}
 
 			if (st->ecnt > prev_ecnt && commands[st->state]->type == META_COMMAND)
@@ -2733,3 +2788,4 @@ pthread_join(pthread_t th, void **thread_return)
 }
 
 #endif   /* WIN32 */
+/* vi: set ts=4 : */
