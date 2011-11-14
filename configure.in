@@ -979,6 +979,22 @@ if test "$with_ossp_uuid" = yes ; then
 fi
 AC_SUBST(OSSP_UUID_LIBS)
 
+# Check for the Linux epoll interface; epoll* may be available in libc
+# but return ENOSYS on a pre-2.6 kernel, so do a run-time check.
+AC_CACHE_CHECK([for epoll support], [pg_cv_epoll],
+[AC_TRY_RUN([
+#include <sys/epoll.h>
+#include <unistd.h>
+
+int main()
+{
+    return epoll_create(5) == -1;
+}], [pg_cv_epoll=yes], [pg_cv_epoll=no], [pg_cv_epoll=no])])
+
+if test "$pg_cv_epoll" = "yes"; then
+   AC_DEFINE([HAVE_EPOLL], 1, [Define if the epoll interface is supported])
+fi
+
 
 ##
 ## Header files
