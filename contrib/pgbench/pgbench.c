@@ -2427,7 +2427,7 @@ threadRun(void *arg)
 		int64		now_usec = 0;
 		int64		min_usec;
 		int			sock;
-		int			nsocks; /* return from select(2) */
+		int			nfds;
 
 		FD_ZERO(&input_mask);
 
@@ -2485,11 +2485,11 @@ threadRun(void *arg)
 
 				timeout.tv_sec = min_usec / 1000000;
 				timeout.tv_usec = min_usec % 1000000;
-				nsocks = select(maxsock + 1, &input_mask, NULL, NULL, &timeout);
+				nfds = select(maxsock + 1, &input_mask, NULL, NULL, &timeout);
 			}
 			else
-				nsocks = select(maxsock + 1, &input_mask, NULL, NULL, NULL);
-			if (nsocks < 0)
+				nfds = select(maxsock + 1, &input_mask, NULL, NULL, NULL);
+			if (nfds < 0)
 			{
 				if (errno == EINTR)
 					continue;
