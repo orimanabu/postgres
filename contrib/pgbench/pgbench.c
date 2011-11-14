@@ -2426,6 +2426,8 @@ threadRun(void *arg)
 		int			maxsock;	/* max socket number to be waited */
 		int64		now_usec = 0;
 		int64		min_usec;
+		int			sock;
+		int			nsocks; /* return from select(2) */
 
 		FD_ZERO(&input_mask);
 
@@ -2435,7 +2437,6 @@ threadRun(void *arg)
 		{
 			CState	   *st = &state[i];
 			Command   **commands = sql_files[st->use_file];
-			int			sock;
 
 			if (st->sleeping)
 			{
@@ -2478,8 +2479,6 @@ threadRun(void *arg)
 
 		if (min_usec > 0 && maxsock != -1)
 		{
-			int			nsocks; /* return from select(2) */
-
 			if (min_usec != INT64_MAX)
 			{
 				struct timeval timeout;
