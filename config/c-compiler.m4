@@ -167,3 +167,32 @@ if test x"$Ac_cachevar" = x"yes"; then
 fi
 undefine([Ac_cachevar])dnl
 ])# PGAC_PROG_CC_LDFLAGS_OPT
+
+
+
+# PGAC_ASM_PPC_LWARX_HAVE_HINT
+# ---------------------------------------
+# Determine if lwarx instruction with 4th option, which is for mutex hint, is accepted.
+#
+AC_DEFUN([PGAC_ASM_PPC_LWARX_HAVE_HINT],
+[AC_MSG_CHECKING([whether lwarx has hint argument])
+AC_CACHE_VAL(pgac_cv_asm_ppc_lwarx_have_hint,
+[AC_TRY_RUN([#include <stdio.h>
+#include <stdlib.h>
+
+int main(int argc, char *argv[])
+{
+	int a = 0;
+	int *x = &a;
+	__asm__ __volatile__ ("lwarx %0,0,%0,1\n\t" :"=r"(x) :"r"(x));
+	exit(0);
+}],
+[pgac_cv_asm_ppc_lwarx_have_hint=yes],
+[pgac_cv_asm_ppc_lwarx_have_hint=no],
+[pgac_cv_asm_ppc_lwarx_have_hint=cross])
+])dnl AC_CACHE_VAL
+AC_MSG_RESULT([$pgac_cv_asm_ppc_lwarx_have_hint])
+if test x"$pgac_cv_asm_ppc_lwarx_have_hint" = xyes ; then
+  AC_DEFINE(HAVE_PPC_MUTEX_HINT, 1, [Define to 1 if the processor have an instruction of powerpc lwarx with hint option])
+fi
+])# PGAC_ASM_PPC_LWARX_HAVE_HINT

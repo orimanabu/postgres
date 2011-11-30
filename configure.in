@@ -1563,6 +1563,7 @@ if test "$enable_nls" = yes -a "$pgac_need_repl_snprintf" = no; then
   fi
 fi
 
+PGAC_ASM_PPC_LWARX_HAVE_HINT
 
 dnl Check to see if we have a working 64-bit integer type.
 dnl This breaks down into two steps:

@@ -877,3 +877,6 @@
 /* Define to empty if the keyword `volatile' does not work. Warning: valid
    code using `volatile' can become incorrect without. Disable with care. */
 #undef volatile
+
+/* Define for ppc to have lwarx with hint option */
+#undef HAVE_PPC_MUTEX_HINT

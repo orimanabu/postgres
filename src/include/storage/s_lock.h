@@ -361,6 +361,16 @@ typedef unsigned int slock_t;
 #endif
 
 #define TAS(lock) tas(lock)
+#define TAS_SPIN(lock) (*(lock) ? 1 : TAS(lock))
+
+#if defined HAVE_PPC_MUTEX_HINT
+#define PPC_MUTEX_HINT_ACQ ",1"
+#define PPC_MUTEX_HINT_REL ",0"
+#else
+#define PPC_MUTEX_HINT_ACQ
+#define PPC_MUTEX_HINT_REL
+#endif /* HAVE_PPC_MUTEX_HINT */
+
 /*
  * NOTE: per the Enhanced PowerPC Architecture manual, v1.0 dated 7-May-2002,
  * an isync is a sufficient synchronization barrier after a lwarx/stwcx loop.
@@ -372,7 +382,7 @@ tas(volatile slock_t *lock)
 	int _res;
 
 	__asm__ __volatile__(
-"	lwarx   %0,0,%3		\n"
+"	lwarx   %0,0,%3" PPC_MUTEX_HINT_ACQ	"	\n"
 "	cmpwi   %0,0		\n"
 "	bne     1f			\n"
 "	addi    %0,%0,1		\n"
