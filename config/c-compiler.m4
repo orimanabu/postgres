@@ -198,7 +198,8 @@ AC_CACHE_VAL(pgac_cv_asm_ppc_lwarx_have_hint,
 
 int main(int argc, char *argv[])
 {
-	int *x;
+	int a = 0;
+	int *x = &a;
 	__asm__ __volatile__ ("lwarx %0,0,%0,1\n\t" :"=r"(x) :"r"(x));
 	exit(0);
 }],
@@ -207,7 +208,8 @@ int main(int argc, char *argv[])
 [pgac_cv_asm_ppc_lwarx_have_hint=cross])
 ])dnl AC_CACHE_VAL
 AC_MSG_RESULT([$pgac_cv_asm_ppc_lwarx_have_hint])
-])
 if test x"$pgac_cv_asm_ppc_lwarx_have_hint" = xyes ; then
   AC_DEFINE(HAVE_PPC_MUTEX_HINT, 1, [Define to 1 if the processor have an instruction of powerpc lwarx with hint option])
-fi])# PGAC_ASM_PPC_LWARX_HAVE_HINT
+fi
+])
+# PGAC_ASM_PPC_LWARX_HAVE_HINT

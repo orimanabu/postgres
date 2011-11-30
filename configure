@@ -23957,7 +23957,8 @@ cat >>conftest.$ac_ext <<_ACEOF
 
 int main(int argc, char *argv[])
 {
-	int *x;
+	int a = 0;
+	int *x = &a;
 	__asm__ __volatile__ ("lwarx %0,0,%0,1\n\t" :"=r"(x) :"r"(x));
 	exit(0);
 }
@@ -24002,6 +24003,13 @@ fi
 fi
 { $as_echo "$as_me:$LINENO: result: $pgac_cv_asm_ppc_lwarx_have_hint" >&5
 $as_echo "$pgac_cv_asm_ppc_lwarx_have_hint" >&6; }
+if test x"$pgac_cv_asm_ppc_lwarx_have_hint" = xyes ; then
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_PPC_MUTEX_HINT 1
+_ACEOF
+
+fi
 
 
 
