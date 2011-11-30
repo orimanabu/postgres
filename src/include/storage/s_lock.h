@@ -360,7 +360,7 @@ typedef unsigned long slock_t;
 typedef unsigned int slock_t;
 #endif
 
-#ifdef 0
+#if defined XXX_OLD_CODE_FOR_HAVE_PPC_MUTEX_HINT
 #define TAS(lock) (*(lock) ? 1 : tas(lock))
 #else
 #define TAS(lock) tas(lock)
