@@ -167,3 +167,47 @@ if test x"$Ac_cachevar" = x"yes"; then
 fi
 undefine([Ac_cachevar])dnl
 ])# PGAC_PROG_CC_LDFLAGS_OPT
+
+
+
+# # PGAC_ASM_PPC_LWARX_HAVE_HINT
+# # -------------
+# # Check if the C compiler understands signed types.
+# AC_DEFUN([PGAC_ASM_PPC_LWARX_HAVE_HINT],
+# [AC_CACHE_CHECK(whether lwarx has hint argument,
+# [AC_TRY_COMPILE([],
+# [int *x; __asm__ ("lwarx %0,0,%0,1\n\t" :"=r"(x) :"r"(x));],
+# [pgac_cv_asm_ppc_lwarx_have_hint=yes],
+# [pgac_cv_asm_ppc_lwarx_have_hint=no])])
+# if test x"$pgac_cv_asm_ppc_lwarx_have_hint" = xyes ; then
+#   AC_DEFINE(PPC_LWARX_HAVE_HINT, 1, [XXXXXX])
+# fi])# PGAC_ASM_PPC_LWARX_HAVE_HINT
+
+# PGAC_ASM_PPC_LWARX_HAVE_HINT
+# ---------------------------------------
+# Determine if printf supports %1$ argument selection, e.g. %5$ selects
+# the fifth argument after the printf print string.
+# This is not in the C99 standard, but in the Single Unix Specification (SUS).
+# It is used in our language translation strings.
+#
+AC_DEFUN([PGAC_ASM_PPC_LWARX_HAVE_HINT],
+[AC_MSG_CHECKING([whether lwarx has hint argument])
+AC_CACHE_VAL(pgac_cv_asm_ppc_lwarx_have_hint,
+[AC_TRY_RUN([#include <stdio.h>
+#include <stdlib.h>
+
+int main(int argc, char *argv[])
+{
+	int *x;
+	__asm__ __volatile__ ("lwarx %0,0,%0,1\n\t" :"=r"(x) :"r"(x));
+	exit(0);
+}],
+[pgac_cv_asm_ppc_lwarx_have_hint=yes],
+[pgac_cv_asm_ppc_lwarx_have_hint=no],
+[pgac_cv_asm_ppc_lwarx_have_hint=cross])
+])dnl AC_CACHE_VAL
+AC_MSG_RESULT([$pgac_cv_asm_ppc_lwarx_have_hint])
+])
+if test x"$pgac_cv_asm_ppc_lwarx_have_hint" = xyes ; then
+  AC_DEFINE(HAVE_PPC_MUTEX_HINT, 1, [Define to 1 if the processor have an instruction of powerpc lwarx with hint option])
+fi])# PGAC_ASM_PPC_LWARX_HAVE_HINT
