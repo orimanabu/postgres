@@ -1188,7 +1188,8 @@ rewriteTargetListUD(Query *parsetree, RangeTblEntry *target_rte,
 		 */
 		var = makeWholeRowVar(target_rte,
 							  parsetree->resultRelation,
-							  0);
+							  0,
+							  false);
 
 		attrname = "wholerow";
 	}
@@ -1381,6 +1382,7 @@ ApplyRetrieveRule(Query *parsetree,
 
 	rte->rtekind = RTE_SUBQUERY;
 	rte->relid = InvalidOid;
+	rte->security_barrier = RelationIsSecurityView(relation);
 	rte->subquery = rule_action;
 	rte->inh = false;			/* must not be set for a subquery */
 

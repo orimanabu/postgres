@@ -287,6 +287,9 @@ typedef struct _tocEntry
 	void	   *dataDumperArg;	/* Arg for above routine */
 	void	   *formatData;		/* TOC Entry data specific to file format */
 
+	/* in post data? not quite the same as section, might be SECTION_NONE */
+	bool        inPostData;
+
 	/* working state (needed only for parallel restore) */
 	struct _tocEntry *par_prev; /* list links for pending/ready items; */
 	struct _tocEntry *par_next; /* these are NULL if not in either list */
@@ -298,12 +301,9 @@ typedef struct _tocEntry
 	int			nLockDeps;		/* number of such dependencies */
 } TocEntry;
 
-/* Used everywhere */
-extern const char *progname;
 
 extern void die_horribly(ArchiveHandle *AH, const char *modulename, const char *fmt,...) __attribute__((format(PG_PRINTF_ATTRIBUTE, 3, 4)));
 extern void warn_or_die_horribly(ArchiveHandle *AH, const char *modulename, const char *fmt,...) __attribute__((format(PG_PRINTF_ATTRIBUTE, 3, 4)));
-extern void write_msg(const char *modulename, const char *fmt,...) __attribute__((format(PG_PRINTF_ATTRIBUTE, 2, 3)));
 
 extern void WriteTOC(ArchiveHandle *AH);
 extern void ReadTOC(ArchiveHandle *AH);

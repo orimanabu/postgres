@@ -605,11 +605,8 @@ DATA(insert (	1029   600 600 5 s	508 783 0 ));
 DATA(insert (	1029   600 600 10 s 509 783 0 ));
 DATA(insert (	1029   600 600 6 s	510 783 0 ));
 DATA(insert (	1029   600 600 15 o 517 783 1970 ));
-DATA(insert (	1029   603 600 27 s 433 783 0 ));
 DATA(insert (	1029   600 603 28 s 511 783 0 ));
-DATA(insert (	1029   604 600 47 s 757 783 0 ));
 DATA(insert (	1029   600 604 48 s 756 783 0 ));
-DATA(insert (	1029   718 600 67 s 759 783 0 ));
 DATA(insert (	1029   600 718 68 s 758 783 0 ));
 
 
@@ -726,17 +723,48 @@ DATA(insert (	3903   3831 3831 1 s	3882 405 0 ));
 /*
  * GiST range_ops
  */
-DATA(insert (	3919   3831 3831 1 s	3882 783 0 ));
-DATA(insert (	3919   3831 3831 2 s	3883 783 0 ));
+DATA(insert (	3919   3831 3831 1 s	3893 783 0 ));
+DATA(insert (	3919   3831 3831 2 s	3895 783 0 ));
 DATA(insert (	3919   3831 3831 3 s	3888 783 0 ));
-DATA(insert (	3919   3831 2776 4 s	3889 783 0 ));
-DATA(insert (	3919   2776 3831 5 s	3891 783 0 ));
-DATA(insert (	3919   3831 3831 6 s	3890 783 0 ));
-DATA(insert (	3919   3831 3831 7 s	3892 783 0 ));
-DATA(insert (	3919   3831 3831 8 s	3893 783 0 ));
-DATA(insert (	3919   3831 3831 9 s	3894 783 0 ));
-DATA(insert (	3919   3831 3831 10 s	3895 783 0 ));
-DATA(insert (	3919   3831 3831 11 s	3896 783 0 ));
-DATA(insert (	3919   3831 3831 12 s	3897 783 0 ));
+DATA(insert (	3919   3831 3831 4 s	3896 783 0 ));
+DATA(insert (	3919   3831 3831 5 s	3894 783 0 ));
+DATA(insert (	3919   3831 3831 6 s	3897 783 0 ));
+DATA(insert (	3919   3831 3831 7 s	3890 783 0 ));
+DATA(insert (	3919   3831 3831 8 s	3892 783 0 ));
+DATA(insert (	3919   3831 2283 16 s	3889 783 0 ));
+DATA(insert (	3919   3831 3831 18 s	3882 783 0 ));
+
+/*
+ * SP-GiST quad_point_ops
+ */
+DATA(insert (	4015   600 600 11 s 506 4000 0 ));
+DATA(insert (	4015   600 600 1 s	507 4000 0 ));
+DATA(insert (	4015   600 600 5 s	508 4000 0 ));
+DATA(insert (	4015   600 600 10 s 509 4000 0 ));
+DATA(insert (	4015   600 600 6 s	510 4000 0 ));
+DATA(insert (	4015   600 603 8 s	511 4000 0 ));
+
+/*
+ * SP-GiST kd_point_ops
+ */
+DATA(insert (	4016   600 600 11 s 506 4000 0 ));
+DATA(insert (	4016   600 600 1 s	507 4000 0 ));
+DATA(insert (	4016   600 600 5 s	508 4000 0 ));
+DATA(insert (	4016   600 600 10 s 509 4000 0 ));
+DATA(insert (	4016   600 600 6 s	510 4000 0 ));
+DATA(insert (	4016   600 603 8 s	511 4000 0 ));
+
+/*
+ * SP-GiST text_ops
+ */
+DATA(insert (	4017   25 25 1 s	2314 4000 0 ));
+DATA(insert (	4017   25 25 2 s	2315 4000 0 ));
+DATA(insert (	4017   25 25 3 s	98	4000 0 ));
+DATA(insert (	4017   25 25 4 s	2317 4000 0 ));
+DATA(insert (	4017   25 25 5 s	2318 4000 0 ));
+DATA(insert (	4017   25 25 11 s	664 4000 0 ));
+DATA(insert (	4017   25 25 12 s	665 4000 0 ));
+DATA(insert (	4017   25 25 14 s	667 4000 0 ));
+DATA(insert (	4017   25 25 15 s	666 4000 0 ));
 
 #endif   /* PG_AMOP_H */

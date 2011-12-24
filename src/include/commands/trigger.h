@@ -112,12 +112,10 @@ extern Oid CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 			  Oid constraintOid, Oid indexOid,
 			  bool isInternal);
 
-extern void DropTrigger(RangeVar *relation, const char *trigname,
-			DropBehavior behavior, bool missing_ok);
 extern void RemoveTriggerById(Oid trigOid);
 extern Oid	get_trigger_oid(Oid relid, const char *name, bool missing_ok);
 
-extern void renametrig(Oid relid, const char *oldname, const char *newname);
+extern void renametrig(RenameStmt *stmt);
 
 extern void EnableDisableTrigger(Relation rel, const char *tgname,
 					 char fires_when, bool skip_system);
