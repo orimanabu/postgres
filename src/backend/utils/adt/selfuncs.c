@@ -5970,9 +5970,7 @@ string_to_bytea_const(const char *str, size_t str_len)
 
 static void
 genericcostestimate(PlannerInfo *root,
-					IndexOptInfo *index,
-					List *indexQuals,
-					List *indexOrderBys,
+					IndexPath *path,
 					RelOptInfo *outer_rel,
 					double numIndexTuples,
 					Cost *indexStartupCost,
@@ -5980,6 +5978,9 @@ genericcostestimate(PlannerInfo *root,
 					Selectivity *indexSelectivity,
 					double *indexCorrelation)
 {
+	IndexOptInfo *index = path->indexinfo;
+	List	   *indexQuals = path->indexquals;
+	List	   *indexOrderBys = path->indexorderbys;
 	double		numIndexPages;
 	double		num_sa_scans;
 	double		num_outer_scans;
@@ -6232,14 +6233,13 @@ Datum
 btcostestimate(PG_FUNCTION_ARGS)
 {
 	PlannerInfo *root = (PlannerInfo *) PG_GETARG_POINTER(0);
-	IndexOptInfo *index = (IndexOptInfo *) PG_GETARG_POINTER(1);
-	List	   *indexQuals = (List *) PG_GETARG_POINTER(2);
-	List	   *indexOrderBys = (List *) PG_GETARG_POINTER(3);
-	RelOptInfo *outer_rel = (RelOptInfo *) PG_GETARG_POINTER(4);
-	Cost	   *indexStartupCost = (Cost *) PG_GETARG_POINTER(5);
-	Cost	   *indexTotalCost = (Cost *) PG_GETARG_POINTER(6);
-	Selectivity *indexSelectivity = (Selectivity *) PG_GETARG_POINTER(7);
-	double	   *indexCorrelation = (double *) PG_GETARG_POINTER(8);
+	IndexPath  *path = (IndexPath *) PG_GETARG_POINTER(1);
+	RelOptInfo *outer_rel = (RelOptInfo *) PG_GETARG_POINTER(2);
+	Cost	   *indexStartupCost = (Cost *) PG_GETARG_POINTER(3);
+	Cost	   *indexTotalCost = (Cost *) PG_GETARG_POINTER(4);
+	Selectivity *indexSelectivity = (Selectivity *) PG_GETARG_POINTER(5);
+	double	   *indexCorrelation = (double *) PG_GETARG_POINTER(6);
+	IndexOptInfo *index = path->indexinfo;
 	Oid			relid;
 	AttrNumber	colnum;
 	VariableStatData vardata;
@@ -6250,7 +6250,8 @@ btcostestimate(PG_FUNCTION_ARGS)
 	bool		found_saop;
 	bool		found_is_null_op;
 	double		num_sa_scans;
-	ListCell   *l;
+	ListCell   *lcc,
+			   *lci;
 
 	/*
 	 * For a btree scan, only leading '=' quals plus inequality quals for the
@@ -6258,8 +6259,8 @@ btcostestimate(PG_FUNCTION_ARGS)
 	 * the "boundary quals" that determine the starting and stopping points of
 	 * the index scan).  Additional quals can suppress visits to the heap, so
 	 * it's OK to count them in indexSelectivity, but they should not count
-	 * for estimating numIndexTuples.  So we must examine the given indexQuals
-	 * to find out which ones count as boundary quals.	We rely on the
+	 * for estimating numIndexTuples.  So we must examine the given indexquals
+	 * to find out which ones count as boundary quals.  We rely on the
 	 * knowledge that they are given in index column order.
 	 *
 	 * For a RowCompareExpr, we consider only the first column, just as
@@ -6275,9 +6276,9 @@ btcostestimate(PG_FUNCTION_ARGS)
 	found_saop = false;
 	found_is_null_op = false;
 	num_sa_scans = 1;
-	foreach(l, indexQuals)
+	forboth(lcc, path->indexquals, lci, path->indexqualcols)
 	{
-		RestrictInfo *rinfo = (RestrictInfo *) lfirst(l);
+		RestrictInfo *rinfo = (RestrictInfo *) lfirst(lcc);
 		Expr	   *clause;
 		Node	   *leftop,
 				   *rightop;
@@ -6285,8 +6286,20 @@ btcostestimate(PG_FUNCTION_ARGS)
 		int			op_strategy;
 		bool		is_null_op = false;
 
+		if (indexcol != lfirst_int(lci))
+		{
+			/* Beginning of a new column's quals */
+			if (!eqQualHere)
+				break;			/* done if no '=' qual for indexcol */
+			eqQualHere = false;
+			indexcol++;
+			if (indexcol != lfirst_int(lci))
+				break;			/* no quals at all for indexcol */
+		}
+
 		Assert(IsA(rinfo, RestrictInfo));
 		clause = rinfo->clause;
+
 		if (IsA(clause, OpExpr))
 		{
 			leftop = get_leftop(clause);
@@ -6329,37 +6342,18 @@ btcostestimate(PG_FUNCTION_ARGS)
 				 (int) nodeTag(clause));
 			continue;			/* keep compiler quiet */
 		}
+
 		if (match_index_to_operand(leftop, indexcol, index))
 		{
 			/* clause_op is correct */
 		}
-		else if (match_index_to_operand(rightop, indexcol, index))
+		else
 		{
+			Assert(match_index_to_operand(rightop, indexcol, index));
 			/* Must flip operator to get the opfamily member */
 			clause_op = get_commutator(clause_op);
 		}
-		else
-		{
-			/* Must be past the end of quals for indexcol, try next */
-			if (!eqQualHere)
-				break;			/* done if no '=' qual for indexcol */
-			indexcol++;
-			eqQualHere = false;
-			if (match_index_to_operand(leftop, indexcol, index))
-			{
-				/* clause_op is correct */
-			}
-			else if (match_index_to_operand(rightop, indexcol, index))
-			{
-				/* Must flip operator to get the opfamily member */
-				clause_op = get_commutator(clause_op);
-			}
-			else
-			{
-				/* No quals for new indexcol, so we are done */
-				break;
-			}
-		}
+
 		/* check for equality operator */
 		if (OidIsValid(clause_op))
 		{
@@ -6416,8 +6410,8 @@ btcostestimate(PG_FUNCTION_ARGS)
 		numIndexTuples = rint(numIndexTuples / num_sa_scans);
 	}
 
-	genericcostestimate(root, index, indexQuals, indexOrderBys,
-						outer_rel, numIndexTuples,
+	genericcostestimate(root, path, outer_rel,
+						numIndexTuples,
 						indexStartupCost, indexTotalCost,
 						indexSelectivity, indexCorrelation);
 
@@ -6532,16 +6526,14 @@ Datum
 hashcostestimate(PG_FUNCTION_ARGS)
 {
 	PlannerInfo *root = (PlannerInfo *) PG_GETARG_POINTER(0);
-	IndexOptInfo *index = (IndexOptInfo *) PG_GETARG_POINTER(1);
-	List	   *indexQuals = (List *) PG_GETARG_POINTER(2);
-	List	   *indexOrderBys = (List *) PG_GETARG_POINTER(3);
-	RelOptInfo *outer_rel = (RelOptInfo *) PG_GETARG_POINTER(4);
-	Cost	   *indexStartupCost = (Cost *) PG_GETARG_POINTER(5);
-	Cost	   *indexTotalCost = (Cost *) PG_GETARG_POINTER(6);
-	Selectivity *indexSelectivity = (Selectivity *) PG_GETARG_POINTER(7);
-	double	   *indexCorrelation = (double *) PG_GETARG_POINTER(8);
+	IndexPath  *path = (IndexPath *) PG_GETARG_POINTER(1);
+	RelOptInfo *outer_rel = (RelOptInfo *) PG_GETARG_POINTER(2);
+	Cost	   *indexStartupCost = (Cost *) PG_GETARG_POINTER(3);
+	Cost	   *indexTotalCost = (Cost *) PG_GETARG_POINTER(4);
+	Selectivity *indexSelectivity = (Selectivity *) PG_GETARG_POINTER(5);
+	double	   *indexCorrelation = (double *) PG_GETARG_POINTER(6);
 
-	genericcostestimate(root, index, indexQuals, indexOrderBys, outer_rel, 0.0,
+	genericcostestimate(root, path, outer_rel, 0.0,
 						indexStartupCost, indexTotalCost,
 						indexSelectivity, indexCorrelation);
 
@@ -6552,16 +6544,14 @@ Datum
 gistcostestimate(PG_FUNCTION_ARGS)
 {
 	PlannerInfo *root = (PlannerInfo *) PG_GETARG_POINTER(0);
-	IndexOptInfo *index = (IndexOptInfo *) PG_GETARG_POINTER(1);
-	List	   *indexQuals = (List *) PG_GETARG_POINTER(2);
-	List	   *indexOrderBys = (List *) PG_GETARG_POINTER(3);
-	RelOptInfo *outer_rel = (RelOptInfo *) PG_GETARG_POINTER(4);
-	Cost	   *indexStartupCost = (Cost *) PG_GETARG_POINTER(5);
-	Cost	   *indexTotalCost = (Cost *) PG_GETARG_POINTER(6);
-	Selectivity *indexSelectivity = (Selectivity *) PG_GETARG_POINTER(7);
-	double	   *indexCorrelation = (double *) PG_GETARG_POINTER(8);
+	IndexPath  *path = (IndexPath *) PG_GETARG_POINTER(1);
+	RelOptInfo *outer_rel = (RelOptInfo *) PG_GETARG_POINTER(2);
+	Cost	   *indexStartupCost = (Cost *) PG_GETARG_POINTER(3);
+	Cost	   *indexTotalCost = (Cost *) PG_GETARG_POINTER(4);
+	Selectivity *indexSelectivity = (Selectivity *) PG_GETARG_POINTER(5);
+	double	   *indexCorrelation = (double *) PG_GETARG_POINTER(6);
 
-	genericcostestimate(root, index, indexQuals, indexOrderBys, outer_rel, 0.0,
+	genericcostestimate(root, path, outer_rel, 0.0,
 						indexStartupCost, indexTotalCost,
 						indexSelectivity, indexCorrelation);
 
@@ -6572,16 +6562,14 @@ Datum
 spgcostestimate(PG_FUNCTION_ARGS)
 {
 	PlannerInfo *root = (PlannerInfo *) PG_GETARG_POINTER(0);
-	IndexOptInfo *index = (IndexOptInfo *) PG_GETARG_POINTER(1);
-	List	   *indexQuals = (List *) PG_GETARG_POINTER(2);
-	List	   *indexOrderBys = (List *) PG_GETARG_POINTER(3);
-	RelOptInfo *outer_rel = (RelOptInfo *) PG_GETARG_POINTER(4);
-	Cost	   *indexStartupCost = (Cost *) PG_GETARG_POINTER(5);
-	Cost	   *indexTotalCost = (Cost *) PG_GETARG_POINTER(6);
-	Selectivity *indexSelectivity = (Selectivity *) PG_GETARG_POINTER(7);
-	double	   *indexCorrelation = (double *) PG_GETARG_POINTER(8);
+	IndexPath  *path = (IndexPath *) PG_GETARG_POINTER(1);
+	RelOptInfo *outer_rel = (RelOptInfo *) PG_GETARG_POINTER(2);
+	Cost	   *indexStartupCost = (Cost *) PG_GETARG_POINTER(3);
+	Cost	   *indexTotalCost = (Cost *) PG_GETARG_POINTER(4);
+	Selectivity *indexSelectivity = (Selectivity *) PG_GETARG_POINTER(5);
+	double	   *indexCorrelation = (double *) PG_GETARG_POINTER(6);
 
-	genericcostestimate(root, index, indexQuals, indexOrderBys, outer_rel, 0.0,
+	genericcostestimate(root, path, outer_rel, 0.0,
 						indexStartupCost, indexTotalCost,
 						indexSelectivity, indexCorrelation);
 
@@ -6895,14 +6883,15 @@ Datum
 gincostestimate(PG_FUNCTION_ARGS)
 {
 	PlannerInfo *root = (PlannerInfo *) PG_GETARG_POINTER(0);
-	IndexOptInfo *index = (IndexOptInfo *) PG_GETARG_POINTER(1);
-	List	   *indexQuals = (List *) PG_GETARG_POINTER(2);
-	List	   *indexOrderBys = (List *) PG_GETARG_POINTER(3);
-	RelOptInfo *outer_rel = (RelOptInfo *) PG_GETARG_POINTER(4);
-	Cost	   *indexStartupCost = (Cost *) PG_GETARG_POINTER(5);
-	Cost	   *indexTotalCost = (Cost *) PG_GETARG_POINTER(6);
-	Selectivity *indexSelectivity = (Selectivity *) PG_GETARG_POINTER(7);
-	double	   *indexCorrelation = (double *) PG_GETARG_POINTER(8);
+	IndexPath  *path = (IndexPath *) PG_GETARG_POINTER(1);
+	RelOptInfo *outer_rel = (RelOptInfo *) PG_GETARG_POINTER(2);
+	Cost	   *indexStartupCost = (Cost *) PG_GETARG_POINTER(3);
+	Cost	   *indexTotalCost = (Cost *) PG_GETARG_POINTER(4);
+	Selectivity *indexSelectivity = (Selectivity *) PG_GETARG_POINTER(5);
+	double	   *indexCorrelation = (double *) PG_GETARG_POINTER(6);
+	IndexOptInfo *index = path->indexinfo;
+	List	   *indexQuals = path->indexquals;
+	List	   *indexOrderBys = path->indexorderbys;
 	ListCell   *l;
 	List	   *selectivityQuals;
 	double		numPages = index->pages,
