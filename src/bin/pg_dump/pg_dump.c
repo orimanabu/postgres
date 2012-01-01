@@ -860,7 +860,8 @@ help(const char *progname)
 
 	printf(_("\nGeneral options:\n"));
 	printf(_("  -f, --file=FILENAME         output file or directory name\n"));
-	printf(_("  -F, --format=c|d|t|p        output file format (custom, directory, tar, plain text)\n"));
+	printf(_("  -F, --format=c|d|t|p        output file format (custom, directory, tar,\n"
+			 "                              plain text (default))\n"));
 	printf(_("  -v, --verbose               verbose mode\n"));
 	printf(_("  -Z, --compress=0-9          compression level for compressed formats\n"));
 	printf(_("  --lock-wait-timeout=TIMEOUT fail after waiting TIMEOUT for a table lock\n"));
@@ -11765,7 +11766,8 @@ dumpUserMappings(Archive *fout,
 					  "FROM pg_options_to_table(umoptions)"
 					  "), ', ') AS umoptions "
 					  "FROM pg_user_mappings "
-					  "WHERE srvid = '%u'",
+					  "WHERE srvid = '%u' "
+					  "ORDER BY usename",
 					  catalogId.oid);
 
 	res = PQexec(g_conn, query->data);
@@ -14384,7 +14386,7 @@ myFormatType(const char *typname, int32 typmod)
 	}
 
 	/* Show lengths on bpchar and varchar */
-	if (!strcmp(typname, "bpchar"))
+	if (strcmp(typname, "bpchar") == 0)
 	{
 		int			len = (typmod - VARHDRSZ);
 
@@ -14393,14 +14395,14 @@ myFormatType(const char *typname, int32 typmod)
 			appendPQExpBuffer(buf, "(%d)",
 							  typmod - VARHDRSZ);
 	}
-	else if (!strcmp(typname, "varchar"))
+	else if (strcmp(typname, "varchar") == 0)
 	{
 		appendPQExpBuffer(buf, "character varying");
 		if (typmod != -1)
 			appendPQExpBuffer(buf, "(%d)",
 							  typmod - VARHDRSZ);
 	}
-	else if (!strcmp(typname, "numeric"))
+	else if (strcmp(typname, "numeric") == 0)
 	{
 		appendPQExpBuffer(buf, "numeric");
 		if (typmod != -1)
