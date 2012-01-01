@@ -170,6 +170,10 @@
 #define PG_PRINTF_ATTRIBUTE printf
 #endif
 
+#if defined(__ppc64__) || defined(__powerpc64__)
+#define USE_PPC_LWARX_MUTEX_HINT
+#endif
+
 /*
  *------------------------------------------------------------------------
  * The following symbols are for enabling debugging code, not for
