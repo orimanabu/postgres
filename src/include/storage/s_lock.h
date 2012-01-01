@@ -363,7 +363,7 @@ typedef unsigned int slock_t;
 #define TAS(lock) tas(lock)
 #define TAS_SPIN(lock) (*(lock) ? 1 : TAS(lock))
 
-#if defined HAVE_PPC_MUTEX_HINT
+#ifdef USE_PPC_LWARX_MUTEX_HINT
 #define PPC_MUTEX_HINT_ACQ ",1"
 #define PPC_MUTEX_HINT_REL ",0"
 #else
