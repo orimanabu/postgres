@@ -1833,7 +1833,14 @@ printResults(int ttype, int normal_xacts, int nclients,
 						(INSTR_TIME_GET_DOUBLE(conn_total_time) / nthreads));
 
 	if (use_simple_result) {
-		printf("%d\n", (int)(tps_exclude/10));
+		if (use_simple_result > 1) {
+			struct timeval tv;
+			struct tm *tm;
+			gettimeofday(&tv, NULL);
+			tm = localtime(&tv.tv_sec);
+			printf("%02d:%02d:%02d ", tm->tm_hour, tm->tm_min, tm->tm_sec);
+		}
+		printf("%d\n", (int)(tps_include));
 		return;
 	}
 
