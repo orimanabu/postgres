@@ -1,5 +1,6 @@
 /*
  * pgbench.c
+ * RUNTIME REPORT VERSION (harukat@sraoss.co.jp)
  *
  * A simple benchmark program for PostgreSQL
  * Originally written by Tatsuo Ishii and enhanced by many contributors.
@@ -107,6 +108,8 @@ extern int	optind;
 int			nxacts = 0;			/* number of transactions per client */
 int			duration = 0;		/* duration in seconds */
 
+int			use_simple_result = 0;
+
 /*
  * scaling factor. for example, scale = 10 will make 1000000 tuples in
  * pgbench_accounts table.
@@ -157,6 +160,8 @@ const char *progname;
 
 volatile bool timer_exceeded = false;	/* flag from signal handler */
 
+volatile bool print_thread_stop = false;
+
 /* variable definitions */
 typedef struct
 {
@@ -204,6 +209,17 @@ typedef struct
 	int		   *exec_count;		/* number of cmd executions (per Command) */
 	unsigned short random_state[3];		/* separate randomness for each thread */
 } TState;
+
+/* printRun parameter */
+typedef struct
+{
+	int	ttype;
+	int	nclients;
+	int nthreads;
+	instr_time  start_time;
+	TState*	ts_array;
+	int sleep;
+} print_thread_param_t;
 
 #define INVALID_THREAD		((pthread_t) 0)
 
@@ -336,6 +352,8 @@ xstrdup(const char *s)
 	return result;
 }
 
+
+static void *printRun(void *arg);
 
 static void
 usage(void)
@@ -1814,6 +1832,11 @@ printResults(int ttype, int normal_xacts, int nclients,
 	tps_exclude = normal_xacts / (time_include -
 						(INSTR_TIME_GET_DOUBLE(conn_total_time) / nthreads));
 
+	if (use_simple_result) {
+		printf("%d\n", (int)(tps_exclude/10));
+		return;
+	}
+
 	if (ttype == 0)
 		s = "TPC-B (sort of)";
 	else if (ttype == 2)
@@ -1905,14 +1928,17 @@ main(int argc, char **argv)
 	char	   *filename = NULL;
 	bool		scale_given = false;
 
+	int			use_running_report = -1;
+
 	CState	   *state;			/* status of clients */
 	TState	   *threads;		/* array of thread */
+
+	pthread_t  print_thread;	/* print middle result thread */
 
 	instr_time	start_time;		/* start up time */
 	instr_time	total_time;
 	instr_time	conn_total_time;
 	int			total_xacts;
-
 	int			i;
 
 	static struct option long_options[] = {
@@ -1964,7 +1990,7 @@ main(int argc, char **argv)
 	state = (CState *) xmalloc(sizeof(CState));
 	memset(state, 0, sizeof(CState));
 
-	while ((c = getopt_long(argc, argv, "ih:nvp:dSNc:j:Crs:t:T:U:lf:D:F:M:", long_options, &optindex)) != -1)
+	while ((c = getopt_long(argc, argv, "ih:nvp:dSNc:j:Crs:t:T:U:lf:D:F:M:R:x", long_options, &optindex)) != -1)
 	{
 		switch (c)
 		{
@@ -2016,6 +2042,12 @@ main(int argc, char **argv)
 					exit(1);
 				}
 #endif   /* HAVE_GETRLIMIT */
+				break;
+			case 'R':			/* use running report with sleep */
+				use_running_report = atoi(optarg);
+				break;
+			case 'x':			/* use simple output */
+				use_simple_result++;
 				break;
 			case 'j':			/* jobs */
 				nthreads = atoi(optarg);
@@ -2350,6 +2382,19 @@ main(int argc, char **argv)
 	if (duration > 0)
 		setalarm(duration);
 
+	/* print_thread */
+	{
+		int err;
+		print_thread_param_t ptpt;
+		ptpt.ttype = ttype;
+		ptpt.nclients = nclients;
+		ptpt.nthreads = nthreads;
+		ptpt.start_time = start_time;
+		ptpt.ts_array = threads;
+		ptpt.sleep = use_running_report;
+		err = pthread_create(&print_thread, NULL, printRun, &ptpt);
+	}
+
 	/* start threads */
 	for (i = 0; i < nthreads; i++)
 	{
@@ -2397,6 +2442,9 @@ main(int argc, char **argv)
 	}
 	disconnect_all(state, nclients);
 
+	print_thread_stop = true;
+	pthread_join(print_thread, NULL);
+
 	/* get end time */
 	INSTR_TIME_SET_CURRENT(total_time);
 	INSTR_TIME_SUBTRACT(total_time, start_time);
@@ -2405,6 +2453,57 @@ main(int argc, char **argv)
 
 	return 0;
 }
+
+static void *
+printRun(void *arg)
+{
+	print_thread_param_t* pptp = (print_thread_param_t*) arg;
+	instr_time  total_time;
+	instr_time  last_total_time;
+	instr_time  t;
+	instr_time  conn_total_time;
+	int total_xacts;
+	int last_total_xacts;
+	int i, j;
+	TState* ts_array = pptp->ts_array;
+
+	/* sleep -1 mean disable printRun */
+	if (pptp->sleep < 0) {
+		return NULL;
+	}
+
+	INSTR_TIME_SET_ZERO(conn_total_time);
+
+	last_total_time = pptp->start_time;
+	last_total_xacts = 0;
+
+	while (print_thread_stop == false) {
+		sleep(pptp->sleep);
+		INSTR_TIME_SET_CURRENT(total_time);
+		t = total_time;
+		INSTR_TIME_SUBTRACT(total_time, last_total_time);
+
+		total_xacts = 0;
+		for (i = 0; i < pptp->nthreads; ++i) {
+			for (j = 0; j <	ts_array[i].nstate; ++j) {
+				total_xacts += ts_array[i].state[j].cnt;
+			}
+		}
+
+		/* XXX no conn_total_time XXX */
+		printResults(pptp->ttype, total_xacts - last_total_xacts,
+		  			 pptp->nclients, pptp->ts_array, pptp->nthreads,
+					 total_time, conn_total_time);
+
+		fflush(stdout);
+
+		last_total_xacts = total_xacts;
+		last_total_time = t;
+
+	}
+	return NULL;
+}
+
 
 static void *
 threadRun(void *arg)
